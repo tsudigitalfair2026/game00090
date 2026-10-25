@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ぞうスロット</title>
+<style>
+*{
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
+    -webkit-tap-highlight-color:transparent;
+}
+html,body{
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    touch-action:none;
+    font-family:sans-serif;
+    background:linear-gradient(#87ceeb,#dff6ff);
+}
+.screen{
+    display:none;
+    width:100%;
+    height:100%;
+    padding:16px;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+}
+.screen.active{
+    display:flex;
+}
+h1{
+    font-size:2rem;
+    margin-bottom:16px;
+    color:#1d3557;
+}
+p{
+    margin:8px 0;
+    line-height:1.5;
+}
+button{
+    border:none;
+    border-radius:16px;
+    background:#ffb703;
+    color:#000;
+    font-size:1.2rem;
+    font-weight:bold;
+    padding:16px 24px;
+    min-width:180px;
+    min-height:60px;
+    margin-top:20px;
+}
+#gameScreen{
+    justify-content:flex-start;
+}
+.topbar{
+    width:100%;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:12px;
+    font-size:1.2rem;
+    font-weight:bold;
+}
+.slot-area{
+    width:100%;
+    max-width:420px;
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin-top:20px;
+}
+.reel{
+    flex:1;
+    background:#fff;
+    border:4px solid #457b9d;
+    border-radius:16px;
+    height:140px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:4rem;
+}
+#message{
+    min-height:50px;
+    margin-top:14px;
+    font-weight:bold;
+    color:#1d3557;
+}
+.controls{
+    width:100%;
+    max-width:420px;
+    display:flex;
+    gap:10px;
+    margin-top:18px;
+}
+.stopBtn{
+    flex:1;
+    min-height:70px;
+    font-size:1.1rem;
+}
+#spinBtn{
+    margin-top:20px;
+    width:100%;
+    max-width:420px;
+}
+.rank{
+    font-size:2rem;
+    color:#e63946;
+    margin:12px 0;
+}
+.rainbow{
+    animation:rainbow 1s linear infinite;
+}
+@keyframes rainbow{
+    0%{filter:hue-rotate(0deg);}
+    100%{filter:hue-rotate(360deg);}
+}
+</style>
+</head>
+<body>
+
+<div id="startScreen" class="screen active">
+    <h1>🐘 ぞうスロット 🐘</h1>
+    <p>
+        3つのリールを止めて同じ絵をそろえよう！
+    </p>
+    <p>
+        🐘🐘🐘 = 100点<br>
+        同じ絵2つ = 20点<br>
+        🌈🐘🌈🐘🌈🐘 = 500点
+    </p>
+    <p>
+        虹色のレアぞうは得点5倍！
+    </p>
+    <p>
+        制限時間60秒
+    </p>
+    <button id="startBtn">スタート</button>
+</div>
+
+<div id="gameScreen" class="screen">
+    <div class="topbar">
+        <div>スコア: <span id="score">0</span></div>
+        <div>⏰ <span id="time">60</span></div>
+    </div>
+
+    <div class="slot-area">
+        <div class="reel" id="reel1">🐘</div>
+        <div class="reel" id="reel2">🐘</div>
+        <div class="reel" id="reel3">🐘</div>
+    </div>
+
+    <div id="message">スピンを押そう！</div>
+
+    <button id="spinBtn">🎰 スピン</button>
+
+    <div class="controls">
+        <button class="stopBtn" id="stop1">① とめる</button>
+        <button class="stopBtn" id="stop2">② とめる</button>
+        <button class="stopBtn" id="stop3">③ とめる</button>
+    </div>
+</div>
+
+<div id="resultScreen" class="screen">
+    <h1>結果発表</h1>
+    <p>最終スコア</p>
+    <div style="font-size:3rem;font-weight:bold;" id="finalScore">0</div>
+    <div class="rank" id="rank">C</div>
+    <button id="restartBtn">もう一度遊ぶ</button>
+</div>
+
+<script>
+const symbols = [
+    "🐘","🐘","🐘","🐘",
+    "🦣","🐭","🍎","⭐",
+    "🌈🐘"
+];
+
+const startScreen = document.getElementById("startScreen");
+const gameScreen = document.getElementById("gameScreen");
+const resultScreen = document.getElementById("resultScreen");
+
+const reels = [
+    document.getElementById("reel1"),
+    document.getElementById("reel2"),
+    document.getElementById("reel3")
+];
+
+const stopButtons = [
+    document.getElementById("stop1"),
+    document.getElementById("stop2"),
+    document.getElementById("stop3")
+];
+
+const scoreEl = document.getElementById("score");
+const timeEl = document.getElementById("time");
+const messageEl = document.getElementById("message");
+
+let score = 0;
+let timeLeft = 60;
+let timer = null;
+
+let intervals = [null,null,null];
+let spinning = [false,false,false];
+
+function showScreen(screen){
+    startScreen.classList.remove("active");
+    gameScreen.classList.remove("active");
+    resultScreen.classList.remove("active");
+    screen.classList.add("active");
+}
+
+function randomSymbol(){
+    return symbols[Math.floor(Math.random()*symbols.length)];
+}
+
+function startGame(){
+    score = 0;
+    timeLeft = 60;
+
+    scoreEl.textContent = score;
+    timeEl.textContent = timeLeft;
+
+    clearInterval(timer);
+
+    timer = setInterval(()=>{
+        timeLeft--;
+        timeEl.textContent = timeLeft;
+
+        if(timeLeft <= 0){
+            endGame();
+        }
+    },1000);
+
+    reels.forEach(r=>r.classList.remove("rainbow"));
+
+    messageEl.textContent = "スピンを押そう！";
+
+    showScreen(gameScreen);
+}
+
+function spin(){
+    if(spinning.some(v=>v)) return;
+
+    messageEl.textContent = "3つとも止めよう！";
+
+    for(let i=0;i<3;i++){
+        reels[i].classList.remove("rainbow");
+
+        spinning[i] = true;
+
+        intervals[i] = setInterval(()=>{
+            const symbol = randomSymbol();
+            reels[i].textContent = symbol;
+
+            if(symbol === "🌈🐘"){
+                reels[i].classList.add("rainbow");
+            }else{
+                reels[i].classList.remove("rainbow");
+            }
+        },80);
+    }
+}
+
+function stopReel(index){
+    if(!spinning[index]) return;
+
+    clearInterval(intervals[index]);
+    spinning[index] = false;
+
+    if(reels[index].textContent === "🌈🐘"){
+        reels[index].classList.add("rainbow");
+    }
+
+    if(spinning.every(v=>!v)){
+        judge();
+    }
+}
+
+function judge(){
+    const a = reels[0].textContent;
+    const b = reels[1].textContent;
+    const c = reels[2].textContent;
+
+    let add = 0;
+
+    if(a==="🌈🐘" && b==="🌈🐘" && c==="🌈🐘"){
+        add = 500;
+        messageEl.textContent = "🌈超大当たり！得点5倍！+500";
+    }
+    else if(a===b && b===c){
+        if(a==="🐘"){
+            add = 100;
+            messageEl.textContent = "大当たり！ぞう3つ！+100";
+        }else{
+            add = 60;
+            messageEl.textContent = "3つそろった！+60";
+        }
+    }
+    else if(a===b || b===c || a===c){
+        add = 20;
+        messageEl.textContent = "2つそろった！+20";
+    }
+    else{
+        messageEl.textContent = "はずれ！";
+    }
+
+    score += add;
+    scoreEl.textContent = score;
+}
+
+function endGame(){
+    clearInterval(timer);
+
+    intervals.forEach(i=>clearInterval(i));
+
+    document.getElementById("finalScore").textContent = score;
+
+    let rank = "C";
+
+    if(score >= 1500){
+        rank = "S";
+    }else if(score >= 800){
+        rank = "A";
+    }else if(score >= 300){
+        rank = "B";
+    }
+
+    document.getElementById("rank").textContent = "ランク " + rank;
+
+    showScreen(resultScreen);
+}
+
+document.getElementById("startBtn").addEventListener("click",startGame);
+document.getElementById("spinBtn").addEventListener("click",spin);
+
+stopButtons[0].addEventListener("click",()=>stopReel(0));
+stopButtons[1].addEventListener("click",()=>stopReel(1));
+stopButtons[2].addEventListener("click",()=>stopReel(2));
+
+document.getElementById("restartBtn").addEventListener("click",startGame);
+
+for(const btn of document.querySelectorAll("button")){
+    btn.addEventListener("touchstart",e=>{
+        e.preventDefault();
+    },{passive:false});
+}
+</script>
+
+</body>
+</html>
